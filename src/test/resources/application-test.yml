@@ -25,6 +25,14 @@ reconcile:
   engine-mode: PARALLEL
   cutover-batch-size: 2
 
+# F7 排班：测试关闭定时扫描，过期释放由用例显式触发（惰性/全局方法）
+schedule:
+  scheduling-enabled: false
+  buffer-minutes: 18
+  lock-ttl-minutes: 35
+  engine-mode: NEW
+  cleanup-cron: "0 * * * * ?"
+
 photo:
   # 测试落盘到临时目录，各用例类自分子目录，跑完即弃
   root-dir: ${java.io.tmpdir}/evops-photo-test

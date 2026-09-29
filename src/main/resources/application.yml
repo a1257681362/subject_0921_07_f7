@@ -85,6 +85,19 @@ reconcile:  # 定时调度开关（测试环境关闭，手工/用例直接调�
   # 切换前置条件：最近 N 个批次双引擎结果一致
   cutover-batch-size: 2
 
+# 农机排班防撞（F7，替代作业站手工台账）
+schedule:
+  # 过期待确认预约的定时自动释放开关（异常切回时无需关闭，旧逻辑下没有 PENDING）
+  scheduling-enabled: true
+  # 相邻两班最小间隔（分钟）：间隔 < buffer 不许插；首尾相接（间隔=0）允许，恰好 buffer 分钟也允许
+  buffer-minutes: 18
+  # 待确认预约的临时占位时长（分钟）：PENDING 只锁这么久，过期自动放掉可被新预约挤占
+  lock-ttl-minutes: 35
+  # 防撞模式：NEW 系统防撞（默认）；LEGACY 旧手工台账逻辑（不做任何重叠/缓冲拦截、登记即确认，异常时一键切回）
+  engine-mode: NEW
+  # 过期临时锁自动释放的扫描频率（默认每分钟；错过也有按机惰性释放兜底）
+  cleanup-cron: "0 * * * * ?"
+
 logging:
   level:
     com.evops: INFO

@@ -22,6 +22,11 @@ public final class BizType {
     public static final String SETTLEMENT_GENERATE = "SETTLEMENT_GENERATE";
     public static final String SETTLEMENT_TRANSIT = "SETTLEMENT_TRANSIT";
     public static final String SETTLEMENT_RULE_UPDATE = "SETTLEMENT_RULE_UPDATE";
+    public static final String MACHINE_SCHEDULE_CREATE = "MACHINE_SCHEDULE_CREATE";
+    public static final String MACHINE_SCHEDULE_CONFIRM = "MACHINE_SCHEDULE_CONFIRM";
+    public static final String MACHINE_SCHEDULE_CANCEL = "MACHINE_SCHEDULE_CANCEL";
+    public static final String MACHINE_SCHEDULE_EXPIRE = "MACHINE_SCHEDULE_EXPIRE";
+    public static final String MACHINE_SCHEDULE_MODE_UPDATE = "MACHINE_SCHEDULE_MODE_UPDATE";
 
     private BizType() {
     }

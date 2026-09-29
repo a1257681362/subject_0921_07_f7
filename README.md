@@ -159,3 +159,35 @@
 | GET | `/api/health` | 健康检查（anon） |
 
 新增表：`t_refresh_token`、`t_token_blacklist`。机手操作指引（贴工位）：[docs/auth-guide.md](docs/auth-guide.md)；上线 Runbook：[docs/auth-runbook.md](docs/auth-runbook.md)。
+
+## F7 农机排班防撞
+
+作业站手工排班台账错漏不少，F7 把同一台农机的预约收进系统统一防撞。
+
+### 防撞口径
+
+- **真重叠才冲突**：同一农机，新班与已有占用"一端结束晚于另一端开始"即拒绝（报错带冲突预约单号与时间段）。
+- **首尾相接允许**：一个班结束正好是另一个开始（间隔 0）不算冲突，可贴边排。
+- **缓冲 18 分钟**：相邻两班间隔在 0～18 分钟之间不许插；恰好 18 分钟允许。缓冲时长 `schedule.buffer-minutes`。
+- **待确认只锁 35 分钟**：新建落 `PENDING`、`lock_until=创建+35分钟`，确认前临时占位（一样防撞）；
+  超时未确认由定时任务（默认每分钟）+ 新建/确认前的惰性释放自动置 `EXPIRED` 放掉，原时段可再约。
+- **确认转长期占位**：`PENDING→CONFIRMED` 后解除 35 分钟临时锁，长期防撞。
+- **取消立即释放**：`PENDING/CONFIRMED→CANCELLED`，该时段马上可再约；不物理删除，留痕可查。
+- 不同农机互不相干；同机并发由"按农机分段锁（锁包住事务）+ 请求号台账 + 预约单号唯一约束"共同保证只进一笔。
+
+### 预案：异常立即切回旧逻辑
+
+- 模式 `NEW`（系统防撞，默认）/`LEGACY`（旧手工台账逻辑）落 `t_machine_schedule_config`，可在线切换、重启不丢。
+- **LEGACY 下新建不做任何重叠/缓冲拦截、登记即 `CONFIRMED`（`source=LEGACY`）**，一出异常一键切回，现场改回人工协调；排除后再切回 NEW。切换走请求号台账留痕。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/machine-schedules` | 新增预约（scheduleNo、machineId、startTime、endTime、requestNo；时间 yyyy-MM-dd HH:mm:ss） |
+| POST | `/api/machine-schedules/{id}/confirm` | 确认（PENDING→CONFIRMED，解除临时锁） |
+| POST | `/api/machine-schedules/{id}/cancel` | 取消（立即释放，可再约） |
+| POST | `/api/machine-schedules/release-expired` | 手工释放所有超 35 分钟未确认的占位（返回 released 条数） |
+| GET | `/api/machine-schedules/{id}` | 预约详情 |
+| GET | `/api/machine-schedules?machineId=&date=&status=` | 列表（可按农机、开始日期、状态过滤） |
+| GET/POST | `/api/machine-schedules/config`、`/config/engine-mode` | 查看/在线切换防撞模式（NEW/LEGACY） |
+
+新增表：`t_machine_schedule`、`t_machine_schedule_config`。规则口径与上线/回退操作流：[docs/machine-schedule-runbook.md](docs/machine-schedule-runbook.md)。
