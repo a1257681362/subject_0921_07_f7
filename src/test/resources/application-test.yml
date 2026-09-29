@@ -25,6 +25,13 @@ reconcile:
   engine-mode: PARALLEL
   cutover-batch-size: 2
 
+booking:
+  # 用例直接调服务触发过期释放，不依赖真实定时
+  scheduling-enabled: false
+  mode: NEW
+  buffer-minutes: 18
+  lock-ttl-minutes: 35
+
 photo:
   # 测试落盘到临时目录，各用例类自分子目录，跑完即弃
   root-dir: ${java.io.tmpdir}/evops-photo-test

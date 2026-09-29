@@ -159,3 +159,29 @@
 | GET | `/api/health` | 健康检查（anon） |
 
 新增表：`t_refresh_token`、`t_token_blacklist`。机手操作指引（贴工位）：[docs/auth-guide.md](docs/auth-guide.md)；上线 Runbook：[docs/auth-runbook.md](docs/auth-runbook.md)。
+
+## F7 农机预约排班防撞
+
+作业站手工台账错漏多，排班收进系统：**新增预约先防撞，确认前只临时锁定，过期/取消立即释放**。
+
+- **先查重叠**：新增预约先查同一农机仍占位（HELD/CONFIRMED）的排班，两时段**真正相交**才判重叠；**首尾相接（一端结束=另一端开始）不算冲突**，允许紧挨排班。
+- **18 分钟缓冲**：不重叠但相邻间隔不足 18 分钟不许插单（间隔为 0 的首尾相接豁免；间隔恰好 18 分钟放行）。缓冲分钟可在线配置。
+- **35 分钟临时锁**：预约提交先置 `HELD`（带 `lock_deadline`），确认转 `CONFIRMED` 长期占用；**超过 35 分钟未确认自动 `EXPIRED` 放掉**——每分钟定时扫描，新增预约时再惰性兜底一遍，过期时段立即可被他人预约。
+- **取消立即释放**：HELD/CONFIRMED 可取消，置 `CANCELLED` 并立刻释放时段、可再约；历史与状态日志保留，不物理删除。
+- **乐观锁 + 请求号**：确认/取消带 `version`，并发只有一方成功；预约/确认/取消/口径变更都走 `t_request_record`。
+- **同机并发**：JVM 内按农机分段锁串行化"检查重叠→落库"，跨实例由业务唯一约束与时段校验兜底。
+- **预案先行、一键回退**：防撞口径与 F2 勾稽一样可切换——`NEW`（默认，重叠+缓冲）、`LEGACY`（旧手工台账口径，**仅严格重叠才拦**）、`PARALLEL`（按新口径受理，旧口径差异只记账告警）。**一出异常立即把模式切回 `LEGACY` 即恢复旧逻辑**，排班不中断；参数（缓冲/锁时长）也可在线调、重启不丢（`t_booking_config`）。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/appointments` | 新增预约（machineId、operatorCode、startTime、endTime、requestNo），先防撞，落 HELD 临时锁 |
+| POST | `/api/appointments/{id}/confirm` | 确认（version、operator、requestNo），HELD→CONFIRMED；超时未确认自动过期并拒绝 |
+| POST | `/api/appointments/{id}/cancel` | 取消（version、operator、cancelReason、requestNo），立即释放可再约 |
+| GET | `/api/appointments/{id}` | 详情：预约单头 + 完整状态流转日志 |
+| GET | `/api/appointments?machineId=&status=&limit=` | 排班列表（按开始时间升序） |
+| POST | `/api/appointments/sweep-expired` | 手工触发一轮过期临时锁扫描（返回释放笔数） |
+| GET | `/api/appointments/config` | 查看当前口径（mode/buffer/lockTtl/调度） |
+| POST | `/api/appointments/config/mode` | 切换口径 NEW/LEGACY/PARALLEL（异常回退 LEGACY） |
+| POST | `/api/appointments/config/params` | 在线调整 bufferMinutes / lockTtlMinutes |
+
+时间字段用 ISO-8601（`2026-10-01T08:00:00`）。新增表：`t_machine_appointment`、`t_machine_appointment_log`、`t_booking_config`。上线/值班处置（含一键回退旧逻辑）：[docs/machine-booking-runbook.md](docs/machine-booking-runbook.md)。

@@ -22,6 +22,10 @@ public final class BizType {
     public static final String SETTLEMENT_GENERATE = "SETTLEMENT_GENERATE";
     public static final String SETTLEMENT_TRANSIT = "SETTLEMENT_TRANSIT";
     public static final String SETTLEMENT_RULE_UPDATE = "SETTLEMENT_RULE_UPDATE";
+    public static final String APPOINTMENT_BOOK = "APPOINTMENT_BOOK";
+    public static final String APPOINTMENT_CONFIRM = "APPOINTMENT_CONFIRM";
+    public static final String APPOINTMENT_CANCEL = "APPOINTMENT_CANCEL";
+    public static final String BOOKING_CONFIG_UPDATE = "BOOKING_CONFIG_UPDATE";
 
     private BizType() {
     }

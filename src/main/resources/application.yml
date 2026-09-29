@@ -85,6 +85,19 @@ reconcile:  # 定时调度开关（测试环境关闭，手工/用例直接调�
   # 切换前置条件：最近 N 个批次双引擎结果一致
   cutover-batch-size: 2
 
+# F7 农机预约排班防撞
+booking:
+  # 过期临时锁自动扫描开关（测试环境关闭，用例/值班手工触发 sweep）
+  scheduling-enabled: true
+  # 每分钟扫描一次到点未确认的 HELD 临时锁（只保留 35 分钟）
+  expire-scan-cron: "0 * * * * ?"
+  # 防撞口径：NEW 新口径（重叠+18分钟缓冲）/ LEGACY 旧口径（仅严格重叠，异常回退）/ PARALLEL 并跑观察
+  mode: NEW
+  # 相邻预约最小缓冲分钟，间隔不足不许插单（首尾相接豁免）
+  buffer-minutes: 18
+  # 状态确认前的临时锁定分钟，过期自动释放
+  lock-ttl-minutes: 35
+
 logging:
   level:
     com.evops: INFO
