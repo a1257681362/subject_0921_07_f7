@@ -1,0 +1,90 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: evops-base
+  profiles:
+    active: dev
+  jackson:
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+  datasource:
+    url: jdbc:h2:file:./data/evops;AUTO_SERVER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+  quartz:
+    job-store-type: memory
+    # 内存 JobStore 为单实例口径；同实例内靠 concurrent=false 防重入，
+    # 跨实例/跨触发方式靠 t_recon_batch 每日唯一约束兜底。多实例部署时改 JDBC JobStore。
+    properties:
+      org.quartz.scheduler.instanceName: EvopsScheduler
+
+  servlet:
+    multipart:
+      # 现场照片单张上限 20MB，一次一张
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.evops
+  configuration:
+    map-underscore-to-camel-case: true
+
+# 作业单现场照片
+photo:
+  # 存储根目录：original/ 存原图（永不覆盖），thumb/ 存缩略图（独立目录）
+  root-dir: ./data/photos
+  # 缩略图最长边（px），等比缩放
+  thumb-max-side: 300
+  # 允许的图片格式（按内容识别，不只信扩展名）
+  allowed-types: jpg,jpeg,png
+  # 单张大小上限（字节），与 multipart 限制一致
+  max-file-size: 20971520
+
+# 无状态会话：JWT 双令牌（access 短期访问 + refresh 一次性轮换），登出走黑名单
+auth:
+  # 鉴权总开关。生产保持 true；测试环境 application-test.yml 中置 false 放行既有业务用例。
+  enabled: true
+  # 起步阶段内置登录账号（接入用户表后可移除）。生产务必用环境变量覆盖密码。
+  accounts:
+    - username: ${AUTH_USERNAME:bootstrap}
+      password: ${AUTH_PASSWORD:bootstrap123}
+      roles: system
+  jwt:
+    # HMAC 签名密钥（Base64 编码，至少 32 字节明文）。生产必须通过环境变量 AUTH_JWT_SECRET 覆盖，
+    # 切勿使用下面的开发默认值上线；轮换密钥会使旧令牌全部失效，需重新登录。
+    secret: ${AUTH_JWT_SECRET:ZGV2LW9ubHktZXZvcHMtand0LXNlY3JldC1rZXktMzJieXRlcyE=}
+    # 访问令牌有效期（分钟）：短期，默认 2 小时
+    access-ttl-minutes: 120
+    # 刷新令牌有效期（小时）：长期，默认 7 天
+    refresh-ttl-hours: 168
+    # 黑名单清理：每 10 分钟扫描一次，删除已过期的登记（过期令牌本身就会被拒，登记无需保留）
+    blacklist-cleanup-cron: "0 */10 * * * ?"
+
+# 卫星轨迹账每日勾稽配置
+reconcile:  # 定时调度开关（测试环境关闭，手工/用例直接调服务触发）
+  scheduling-enabled: true
+  # 每天凌晨 02:10 跑前一日的勾稽（避开整点高峰）
+  cron: "0 10 2 * * ?"
+  # 匹配容差（亩）：|双方面积差| <= tolerance 视为一致；可通过配置/接口调整
+  tolerance: 0.05
+  # 引擎模式：PARALLEL 新旧并跑比对（默认，至少并跑两天）；NEW 仅新引擎（切换后）；LEGACY 仅旧引擎（回退用）
+  engine-mode: PARALLEL
+  # 切换前置条件：最近 N 个批次双引擎结果一致
+  cutover-batch-size: 2
+
+logging:
+  level:
+    com.evops: INFO
